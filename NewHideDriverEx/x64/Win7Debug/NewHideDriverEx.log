@@ -1,0 +1,33 @@
+﻿生成启动时间为 2017/12/5 16:29:52。
+     1>项目“E:\DongjCode\NewHideDriverEx\NewHideDriverEx\NewHideDriverEx.vcxproj”在节点 2 上(Rebuild 个目标)。
+     1>StampInf:
+         C:\Program Files (x86)\Windows Kits\8.1\bin\x86\stampinf.exe -d "*" -a "amd64" -v "*" -k "1.11" -u "1.11.0" -f x64\Win7Debug\NewHideDriverEx.inf 
+         Stamping x64\Win7Debug\NewHideDriverEx.inf [Version] section with DriverVer=12/05/2017,16.29.52.83
+       ClCompile:
+         D:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\x86_amd64\CL.exe /c /Ix64\Win7Debug\ /Zi /nologo /W4 /WX- /Od /Oi /Oy- /D _WIN64 /D _AMD64_ /D AMD64 /D DEPRECATE_DDK_FUNCTIONS=1 /D MSC_NOOPT /D _WIN32_WINNT=0x0601 /D WINVER=0x0601 /D WINNT=1 /D NTDDI_VERSION=0x06010000 /D DBG=1 /GF /Gm- /Zp8 /GS /Gy /fp:precise /Zc:wchar_t- /Zc:forScope- /GR- /Fo"x64\Win7Debug\\" /Fd"x64\Win7Debug\vc120.pdb" /Gz /wd4748 /wd4603 /wd4627 /wd4986 /wd4987 /wd4996 /FI"C:\Program Files (x86)\Windows Kits\8.1\Include\Shared\warning.h" /errorReport:prompt /kernel -cbstring -d2epilogunwind /d1import_no_registry /d2AllowCompatibleILVersions /d2Zi+ DriverEntry.c HideDriver.c
+         DriverEntry.c
+     1>DriverEntry.c(23): warning C4100: “Count”: 未引用的形参
+     1>DriverEntry.c(22): warning C4100: “Context”: 未引用的形参
+     1>DriverEntry.c(33): warning C4100: “DeviceObject”: 未引用的形参
+     1>DriverEntry.c(52): warning C4100: “pDevObj”: 未引用的形参
+     1>DriverEntry.c(93): warning C4100: “pDevObj”: 未引用的形参
+     1>DriverEntry.c(126): warning C4100: “pDevObj”: 未引用的形参
+     1>DriverEntry.c(149): warning C4100: “pRegistryPath”: 未引用的形参
+     1>DriverEntry.c(155): warning C4101: “pDevExt”: 未引用的局部变量
+         HideDriver.c
+     1>HideDriver.c(211): warning C4055: “类型转换”: 从数据指针“PVOID”到函数指针“MiProcessLoaderEntry”
+         正在生成代码...
+       Link:
+         D:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\x86_amd64\link.exe /ERRORREPORT:PROMPT /OUT:"E:\DongjCode\NewHideDriverEx\x64\Win7Debug\NewHideDriverEx.sys" /VERSION:"6.3" /INCREMENTAL:NO /NOLOGO /WX /SECTION:"INIT,d" "C:\Program Files (x86)\Windows Kits\8.1\lib\win7\KM\x64\BufferOverflowK.lib" "C:\Program Files (x86)\Windows Kits\8.1\lib\win7\KM\x64\ntoskrnl.lib" "C:\Program Files (x86)\Windows Kits\8.1\lib\win7\KM\x64\hal.lib" "C:\Program Files (x86)\Windows Kits\8.1\lib\win7\KM\x64\wmilib.lib" /NODEFAULTLIB /MANIFEST:NO /DEBUG /PDB:"E:\DongjCode\NewHideDriverEx\x64\Win7Debug\NewHideDriverEx.pdb" /SUBSYSTEM:NATIVE,"6.01" /Driver /OPT:REF /OPT:ICF /ENTRY:"GsDriverEntry" /RELEASE /IMPLIB:"E:\DongjCode\NewHideDriverEx\x64\Win7Debug\NewHideDriverEx.lib" /MERGE:"_TEXT=.text;_PAGE=PAGE" /MACHINE:X64 /PROFILE /kernel /IGNORE:4198,4010,4037,4039,4065,4070,4078,4087,4089,4221,4108,4088,4218,4218,4235 /osversion:6.3 /pdbcompress /debugtype:pdata x64\Win7Debug\DriverEntry.obj
+         x64\Win7Debug\HideDriver.obj
+         NewHideDriverEx.vcxproj -> E:\DongjCode\NewHideDriverEx\x64\Win7Debug\NewHideDriverEx.sys
+       DriverTestSign:
+         C:\Program Files (x86)\Windows Kits\8.1\bin\x86\signtool.exe sign /ph /sha1 "890F7ACFA86B1BB43715A150CB34205276FA082A" 
+         Done Adding Additional Store
+         Successfully signed: E:\DongjCode\NewHideDriverEx\x64\Win7Debug\NewHideDriverEx.sys
+         
+     1>已完成生成项目“E:\DongjCode\NewHideDriverEx\NewHideDriverEx\NewHideDriverEx.vcxproj”(Rebuild 个目标)的操作。
+
+生成成功。
+
+已用时间 00:00:00.35

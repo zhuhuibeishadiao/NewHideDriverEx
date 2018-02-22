@@ -6,3 +6,4 @@ Hide Driver By MiProcessLoaderEntry
 ## win7 x64
 ## win10 14393 x64
 ## win10 15063 x64
+## win10 16299 x64

